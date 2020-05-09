@@ -25,6 +25,7 @@
 *.pdfsync
 *.ps
 *.snm
+*.synctex(busy)
 *.synctex.gz
 *.toc
 *.vrb
