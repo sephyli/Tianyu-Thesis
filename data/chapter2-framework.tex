@@ -13,9 +13,63 @@ CNN模块的输入是图像及对象的无标签区域坐标。首先，经由CN
 
 卷积网络主干的设计至关重要，这一部分主要负责提取图像的全局像素特征。在本研究所针对的区域分类任务中，包含所有对象的高分辨率图像直接输入到这一卷积网络进行降维，输出一个通道数较多，而特征图大小较小的高维特征。
 
-受Mask R-CNN启发，本模块使用ResNet作为卷积网络主干，这一模型具备极强的特征提取能力，在以往的计算机视觉研究中得到了充分验证\upcite{He2016DeepRL, He2017MaskR}。ResNet使用残差连接，解决了卷积神经网络在层数较深时的梯度丢失问题，避免了网络的加深反而导致模型拟合能力变差的情况，这一设计使更深的、拟合能力l更强的网络成为可能。本研究通过实验对比，选择了101层的ResNet以获得最好的特征提取能力，为模型学习到较难分类的特征提供基础。
+受Mask R-CNN启发，本模块使用ResNet作为卷积网络主干，这一模型具备极强的特征提取能力，在以往的计算机视觉研究中得到了充分验证\upcite{He2016DeepRL, He2017MaskR}。ResNet使用残差连接，解决了卷积神经网络在层数较深时的梯度丢失问题，避免了网络的加深反而导致模型拟合能力变差的情况，这一设计使更深的、拟合能力更强的网络成为可能。本研究通过实验对比，选择了101层的ResNet以获得最好的特征提取能力，为模型学习到较难分类的特征提供基础。
 
-本模块所使用的ResNet经过多层降维后，输出特征图到卷积网络主干尾部的特征金字塔网络（Feature Pyramid Networks, FPN）\upcite{Lin2017FeaturePN}。这一部分从ResNet的不同阶段接受不同尺寸的输入，从而生成结合不同维度特征的高质量特征。
+本模块所使用的ResNet经过多层降维后，输出特征图到卷积网络主干尾部的特征金字塔网络（Feature Pyramid Networks, FPN）\upcite{Lin2017FeaturePN}。这一部分从ResNet的不同阶段接受不同尺寸的输入，从而生成结合不同维度特征的高质量特征。下面介绍ResNet的技术实现细节。
+
+\subsubsection{ResNet}
+
+ResNet提出了残差连接和瓶颈结构，两者皆可以用以构建更深更高效的卷积网络。前者可以解决在网络较深时出现的梯度丢失问题，后者则利用瓶颈结构使模型更小更高效。
+
+\paragraph{残差连接}
+
+在以往的卷积网络中，采用直接堆叠卷积核的方式加深网络，而在深层网络中，往往会出现梯度丢失问题，即在过多层的梯度传导中，梯度降低至0。这导致加深网络的深度反而导致网路的性能下降。对于本研究来说，只有够深的网络才能有较强的特征提取能力，使模型具备视觉推理的能力。而ResNet解决了这一问题，其在每个卷积的构建单元中，增加一个残差分支来传导梯度，防止梯度在过多卷积层的传导中丢失。这使得加深卷积网络，如使用100层以上的网络时，网络的性能依然可以继续提升。
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics{figure/ResNet_building_block.eps}
+    \caption{一个残差连接中的卷积构建单元}
+    \label{fig:resnet_building_block}
+\end{figure}
+
+残差连接有多种方法，如投影、零填充和恒等连接。
+
+\subparagraph{恒等连接} 
+
+等式(\ref{res:iden})代表一个卷积构建单元，其中$\mathbf{x}$代表输入的特征，，$\mathcal{F}$代表一个由卷积核构成的残差函数，往往由两层$3 \times 3$卷积层构建而成。而$W_{i}$为该构建单元中卷积核的权重。如图\ref{fig:resnet_building_block}.
+
+\begin{equation} \label{res:iden}
+    y = \mathcal{F} (\mathbf{x}, \{W_{i}\}) + \mathbf{x}.
+\end{equation}
+
+\subparagraph{投影连接} 
+
+等式(\ref{res:proj})中的$W_{s}$为一个线性的投影函数，一般使用$1 \times 1$卷积核来实现。线性体现在该卷积核后不会增加激活函数，而非线性激活操作会在完成加法运算后统一进行。
+
+\begin{equation} \label{res:proj}
+    y = \mathcal{F} (\mathbf{x}, \{W_{i}\}) + W_{s} \mathbf{x}.
+\end{equation}
+
+在实际应用中ResNet在对特征图进行降维时，每个卷积构建单元的输入和输出维度不同，此时使用恒等连接会使两个维度不一样的特征向量相加，造成错误。则应使用投影连接，将单个卷积构建单元中残差分支的维度与卷积核主体的维度相统一。但此时，统一特征维度所使用的卷积操作为密集连接，一定程度上会增加模型的大小。相对来说，恒等连接不会增加模型的参数和计算的复杂度。因此在卷积构建单元无降维操作时，直接使用恒等连接是更优的选择。
+
+本模型在使用ResNet时，101层的网络中存在5次降维操作，即模型的大部分残差连接都由恒等连接构建而成。
+
+\subparagraph{零填充} 
+零填充也是在残差分支与卷积分支维度不同时的一种统一维度的方法。它直接在增加的维度上填充0来匹配二者的输出，但它的效果并不如投影连接好，仅作为在运算性能受限的情况下提供的一种构建选项。
+
+\paragraph{Deeper Bottleneck Architectures.}
+我们需要更深的网络来获得更好的非线性表达能力，则网络的训练时间和在移动设备上的inference或者说forward时间是必须要考虑的因素。
+
+\begin{figure}
+    \centering
+    \includegraphics[width=.8\textwidth]{figure/ResNet_bottleneck.eps}
+    \caption{A deeper residual function $\mathcal{F}$}
+    \label{fig:resnet_bottleneck}
+\end{figure}
+
+因此，ResNet~\cite{He2016DeepRL}提出了{\itshape bottleneck}设计来替换原来的building block。如图~\ref{fig:resnet_bottleneck}，对于每个残差函数$\mathcal{F}$，我们使用了三个卷积层来代替原有的两层，分别是$1 \times 1$，$3 \times 3$和$1 \times 1$卷积，其中$1 \times 1$层负责减小然后增加（恢复）维度，使$3 \times 3$层作为bottleneck，可以具有较小的输入和输出，大大降低了模型的时间复杂度。
+
+无参数的identity shortcut对于bottleneck架构尤为重要。如果用projection替换bottleneck中的shortcut分支，会导致时间复杂度和模型大小翻倍，因为shortcut连接到两个$1 \times 1$卷积层的高维端。因此，identity shortcut可以为bottleneck设计带来更高效的网络结构。
 
 \subsection{感兴趣区域}
 
@@ -27,17 +81,19 @@ CNN模块的输入是图像及对象的无标签区域坐标。首先，经由CN
 
 \subsection{使用语义关系构建知识图谱}
 
-构建基于语义关系的知识图谱有多种途径。首先，根据VG数据集中提供的标注中出现的对象间关系，如位置关系，主-谓-宾关系等等，结合该关系在对象类别之间共同出现的频率，可以构建出依据关系的知识图谱$G_{R}$。另外，根据VG数据集提供的标注中出现的对象属性，如颜色、材质、形状的等，可以构建出对象类别与属性间的概率分布表\upcite{Xu2019ReasoningRCNNUA}。则对每一对对象类别$c_i$和$c_j$的概率分布$P_{c_i}$与$P_{c_j}$计算Jensen–Shannon散度，就可以得到属性知识图谱$G_{A}$的边$e_{c_{i}, c_{j}}^{A}=J S\left(P_{c_{i}} \| P_{c_{j}}\right)$。
+构建基于语义关系的知识图谱有多种途径。首先，根据VG数据集中提供的标注中出现的对象间关系，如位置关系，主-谓-宾关系等等，结合该关系在对象类别之间共同出现的频率，可以构建出依据关系的知识图谱$G_{R}$。另外，根据VG数据集提供的标注中出现的对象属性，如颜色、材质、形状等等，可以构建出对象类别与属性间的概率分布表\upcite{Xu2019ReasoningRCNNUA}。则对每一对对象类别$c_i$和$c_j$的概率分布$P_{c_i}$与$P_{c_j}$计算Jensen–Shannon散度，就可以得到属性知识图谱$G_{A}$的边$e_{c_{i}, c_{j}}^{A}=J S\left(P_{c_{i}} \| P_{c_{j}}\right)$。
 
-$G_{R}$与$G_{A}$中部分分类间的子图如图\ref{fig:subgraph}所示。
+$G_{R}$与$G_{A}$中部分分类间的子图如图\ref{fig:subgraph}所示。当特征在关系知识图谱上$G_{R}$传播时，高置信度的常见分类的节点，就可以通过知识图谱的边对与其相关联的稀少分类节点传播特征，从而丰富稀少分类节点中的特征信息，从而强化其置信率。而与其无关联的节点不会接收到特征的传递，防止特征在分类间泛化，降低模型表现。另外，通过常识得知，属性相近的物体在外观上近似。因为颜色和材质决定了物体表面对光线的反射水平，颜色和材质相近的物体在图像中的像素颜色近似，而外形则影响图像中的形状。如图\ref{fig:subgraph:a}中，摩托车和自行车具有极其相近的属性，其外观也极其相近。而外观相近的物体间存在误认情况，通过属性知识图谱$G_{A}$，使属性相近的物体的分类节点间有特征的传递，可以使预测的置信度趋向由误认分类向正确分类移动。
 
 \begin{figure}[h!]
     \centering
     \subfigure[基于关系的知识图谱]{
         \includegraphics[width=0.45\textwidth]{figure/subgraph_r.png}
+        \label{fig:subgraph:r}
     }
     \subfigure[基于属性的知识图谱]{
         \includegraphics[width=0.45\textwidth]{figure/subgraph_a.png}
+        \label{fig:subgraph:a}
     }
     \caption{$G_{R}$与$G_{A}$中部分分类间的子图图示}
     \label{fig:subgraph}
@@ -45,6 +101,15 @@ $G_{R}$与$G_{A}$中部分分类间的子图如图\ref{fig:subgraph}所示。
 
 \subsection{使用空间关系构建知识图谱}
 
-根据图像中对象的空间位置关系，可以构建出基于空间的知识图谱$G_{Spatial}$。对象的位置关系分为上下、左右、包含、相交等关系。
+根据图像中对象的空间位置关系，可以构建出基于空间的知识图谱$G_{Spatial}$。对象的位置关系分为上下、左右，以及对象区域的包含、重叠等关系。对于对象的上下左右关系，知识图谱边的权重由对象在图像中的像素距离决定，像素距离越远，对象之间的关系越稀疏，因此边的权重应该越低。因此，本研究在节点上应用了核函数$\kappa(x)=\exp (-x / \Delta)$（其中$\Delta = 50$），如图\ref{fig:kernel_func}。对于对象区域的包含或重叠关系，使用图像的交并比（Intersection over Union, IoU）来定义空间关系的边，即对象区域重叠的面积与区域并集面积的比值，IoU越大，代表对象关系越密切。
+
+\begin{figure}
+    \centering
+    \includegraphics[width=.5\textwidth]{figure/kernel.png}
+    \caption{核函数$\kappa(x)=\exp (-x / \Delta)$}
+    \label{fig:kernel_func}
+\end{figure}
+
+
 
 \section{GCN模块}
