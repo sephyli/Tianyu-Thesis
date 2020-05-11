@@ -32,7 +32,7 @@ ResNet提出了残差连接和瓶颈结构，两者皆可以用以构建更深�
     \label{fig:resnet_building_block}
 \end{figure}
 
-残差连接有多种方法，如投影、零填充和恒等连接。
+残差连接的捷径分支有多种连接方法，如投影、零填充和恒等连接。
 
 \subparagraph{恒等连接} 
 
@@ -57,19 +57,19 @@ ResNet提出了残差连接和瓶颈结构，两者皆可以用以构建更深�
 \subparagraph{零填充} 
 零填充也是在残差分支与捷径分支维度不同时的一种统一维度的方法。它直接在捷径分支的输出向量要增加的维度上填充0来匹配输出，但它的效果并不如投影连接好，仅作为在运算性能受限的情况下提供的一种构建选项。
 
-\paragraph{Deeper Bottleneck Architectures.}
-我们需要更深的网络来获得更好的非线性表达能力，则网络的训练时间和在移动设备上的inference或者说forward时间是必须要考虑的因素。
+\paragraph{瓶颈结构}
+我们需要更深的网络来获得更好的特征提取能力的同时，模型的参数数量也需要控制，否则训练成本就会无限制地上升。
 
-\begin{figure}
+\begin{figure}[h!]
     \centering
     \includegraphics[width=.8\textwidth]{figure/ResNet_bottleneck.eps}
     \caption{A deeper residual function $\mathcal{F}$}
     \label{fig:resnet_bottleneck}
 \end{figure}
 
-因此，ResNet~\cite{He2016DeepRL}提出了{\itshape bottleneck}设计来替换原来的building block。如图~\ref{fig:resnet_bottleneck}，对于每个残差函数$\mathcal{F}$，我们使用了三个卷积层来代替原有的两层，分别是$1 \times 1$，$3 \times 3$和$1 \times 1$卷积，其中$1 \times 1$层负责减小然后增加（恢复）维度，使$3 \times 3$层作为bottleneck，可以具有较小的输入和输出，大大降低了模型的时间复杂度。
+因此，ResNet提出了瓶颈结构（Bottleneck）作为网络的卷积构建单元。如图~\ref{fig:resnet_bottleneck}，对于每个残差函数$\mathcal{F}$，其使用了三个卷积层来代替原有的两层，分别是$1 \times 1$，$3 \times 3$和$1 \times 1$卷积核，其中$1 \times 1$卷积核负责降低然后恢复维度，使$3 \times 3$卷积核作为瓶颈，可以具有较小的输入和输出，大大降低了模型的参数数量和运算成本。另外，经过实验证明，应用了瓶颈结构后，模型的准确率和运算速度双双提高。
 
-无参数的identity shortcut对于bottleneck架构尤为重要。如果用projection替换bottleneck中的shortcut分支，会导致时间复杂度和模型大小翻倍，因为shortcut连接到两个$1 \times 1$卷积层的高维端。因此，identity shortcut可以为bottleneck设计带来更高效的网络结构。
+无参数的恒等连接对于瓶颈结构尤为重要。如果在瓶颈结构中全使用投影连接，会导致模型的参数数量和运算成本翻倍。这是因为捷径连接到两个$1 \times 1$卷积核的高维端，较高的特征维度若使用$1 \times 1$卷积核这样较为密集的运算，就会带来巨大的运算成本。因此恒等连接和瓶颈结构是相辅相成的设计。
 
 \subsection{感兴趣区域}
 
