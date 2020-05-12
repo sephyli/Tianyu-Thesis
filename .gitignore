@@ -33,4 +33,5 @@
 *.swp
 *.thm
 *.pdf
+*.html
 .DS_Store
