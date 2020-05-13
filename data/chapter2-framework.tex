@@ -41,7 +41,7 @@ CNN模块的输入是图像及对象的无标签区域坐标。首先，经由CN
     \label{fig:subgraph}
 \end{figure}
 
-构建基于语义关系的知识图谱有多种途径。首先，根据VG数据集中提供的标注中出现的对象间关系，如位置关系，主-谓-宾关系等等，结合该关系在对象类别之间共同出现的频率，可以构建出依据关系的知识图谱$G_{R}$。另外，根据VG数据集提供的标注中出现的对象属性，如颜色、材质、形状等等，可以构建出对象类别与属性间的概率分布表\upcite{Xu2019ReasoningRCNNUA}。则对每一对对象类别$c_i$和$c_j$的概率分布$P_{c_i}$与$P_{c_j}$计算Jensen–Shannon散度，就可以得到属性知识图谱$G_{A}$的边$e_{c_{i}, c_{j}}^{A}=J S\left(P_{c_{i}} \| P_{c_{j}}\right)$。
+构建基于语义关系的知识图谱有多种途径。首先，根据VG数据集中提供的标注中出现的对象间关系，如位置关系，主-谓-宾关系等等，结合该关系在对象类别之间共同出现的频率，可以构建出依据关系的知识图谱$G_{R}$。另外，根据VG数据集提供的标注中出现的对象属性，如颜色、材质、形状等等，可以构建出对象类别与属性间的概率分布表\upcite{Xu2019ReasoningRCNNUA}。则对每一对对象类别$i$和$j$的概率分布$P_{i}$与$P_{j}$计算Jensen–Shannon散度，就可以得到属性知识图谱$G_{A}$的边$e_{i j}^{A}=\operatorname{JS} \left(P_{i} \| P_{j}\right)$。
 
 $G_{R}$与$G_{A}$中部分分类间的子图如图\ref{fig:subgraph}所示。当特征在关系知识图谱上$G_{R}$传播时，高置信度的常见分类的节点，就可以通过知识图谱的边对与其相关联的稀少分类节点传播特征，从而丰富稀少分类节点中的特征信息，从而强化其置信率。而与其无关联的节点不会接收到特征的传递，防止特征在分类间泛化，降低模型表现。另外，通过常识得知，属性相近的物体在外观上近似。因为颜色和材质决定了物体表面对光线的反射水平，颜色和材质相近的物体在图像中的像素颜色近似，而外形则影响图像中的形状。如图\ref{fig:subgraph:a}中，摩托车和自行车具有极其相近的属性，其外观也极其相近。而外观相近的物体间存在误认情况，通过属性知识图谱$G_{A}$，使属性相近的物体的分类节点间有特征的传递，可以使预测的置信度趋向由误认分类向正确分类移动。
 
@@ -54,7 +54,13 @@ $G_{R}$与$G_{A}$中部分分类间的子图如图\ref{fig:subgraph}所示。当
     \label{fig:kernel_func}
 \end{figure}
 
-根据图像中对象的空间位置关系，可以构建出基于空间的知识图谱$G_{Spatial}$。对象的位置关系分为上下、左右，以及对象区域的包含、重叠等关系。对于对象的上下左右关系，知识图谱边的权重由对象在图像中的像素距离决定，像素距离越远，对象之间的关系越稀疏，因此边的权重应该越低。因此，本研究在节点上应用了核函数$\kappa(x)=\exp (-x / \Delta)$（其中$\Delta = 50$），如图\ref{fig:kernel_func}。对于对象区域的包含或重叠关系，使用图像的交并比（Intersection over Union, IoU）来定义空间关系的边，即对象区域重叠的面积与区域并集面积的比值，IoU越大，代表对象关系越密切。
+根据图像中对象的空间位置关系，可以构建出基于空间的知识图谱$G_{S}$。对象的位置关系分为上下、左右，以及对象区域的包含、重叠等关系。对于对象的上下、左右关系，知识图谱边的权重由对象在图像中的像素距离决定，像素距离越远，对象之间的关系越稀疏，因此边的权重应该越低。因此，本研究在节点上应用了核函数$\kappa(x)=\exp (-x / \Delta)$（其中$\Delta = 50$），如图\ref{fig:kernel_func}。对于对象区域的包含或重叠关系，还额外使用图像的交并比（Intersection over Union, IoU）来定义空间关系的边，即对象区域重叠的面积与区域并集面积的比值，IoU越大，代表对象关系越密切。
+
+对于对象所在区域$R_i$、$R_j$，上文提到的像素距离$\operatorname{d}\left(R_i, R_j\right)$通过计算原图像中对象区域中心点位置来得到。而对于重叠来说，重叠关系应比普通的上下左右关系更密切，因此边权为计算出像素距离的权重后$d_{i j}$，再加上重叠对象的交并比$\operatorname{IoU}\left(R_i, R_j\right)$。由于未重叠对象的交并比为0，则对任意对象$i$、$j$，其边权的计算如式\ref{Gs_edge}。
+
+\begin{equation} \label{Gs_edge}
+    e_{i j}^{S}=\kappa\left(\operatorname{d}\left(R_i, R_j\right)\right) + \operatorname{IoU}\left(R_i, R_j\right)
+\end{equation}
 
 \section{GCN模块}
 
@@ -68,9 +74,8 @@ GCN模块的结构由三大部分组成：软分类策略、区域特征在GCN�
 
 首先，对初始分类结果置信度排序的前$k$个分类分别计算Softmax值$S_{i}$。如式\ref{softmax}，其中$e^{i}$代表分类器输出的第$i$个分类的置信度。
 
-\begin{equation}
+\begin{equation} \label{softmax}
     S_{i}=\frac{e^{i}}{\sum_{j} e^{j}}
-    \label{softmax}
 \end{equation}
 
 由此得到前$k$个分类的置信概率分布，依此置信概率为分配权重，将区域特征按比例分配到相应的节点中。
@@ -78,6 +83,47 @@ GCN模块的结构由三大部分组成：软分类策略、区域特征在GCN�
 因为正确的分类往往都会出现在初始结果预测的前$k$个，因此正确的节点就有很大概率接收到该物体的区域特征。即使错误的初始分类会使正确的节点接收到较少的区域特征，但随着区域特征沿关系传播，正确的分类之间存在着关系，则正确的节点的置信度会由此而提高，错误的节点的置信度也会下降。因此，使用软分类策略可以使模型对错误的分类更加鲁棒，增强模型纠正初始预测错误的能力。
 
 \subsection{区域特征在GCN上的传播}
+
+当区域特征由CNN模块正确地通过软分类策略分配到知识图谱的各个节点上时，下一步就是让知识图谱节点上的特征沿知识图谱的边进行传播，在特征进行传播后，要进入分类预测器生成新的预测。知识图谱中的关系是不规则的，对单个节点所表示的对象来说，其关系的多寡是依据现实情况决定的。而我们需要将知识图谱中的不规则的关系融入各个节点区域的特征，更新区域特征后，融入了关系的特征就可以提升分类预测的准确率。受近年来在图卷积网络领域十分热门的图注意力网络\cite{Velickovic2018GraphAN}启发，本研究使用图注意力层作为本模块中传播区域特征的层。
+
+\subsubsection{图注意力层}
+
+图注意力层的输入是一个节点区域特征组成的集合，$\mathbf{h}=\left\{\vec{h}_{1}, \vec{h}_{2}, \ldots, \vec{h}_{N}\right\}, \vec{h}_{i} \in \mathbb{R}^{F}$，其中$N$为节点数量，在本任务中即为分类数量，$F$即为每个节点特征向量的长度。经过特征传播运算后，图注意力层输出新的特征集合$\mathbf{h}^{\prime}=\left\{\vec{h}_{1}^{\prime}, \vec{h}_{2}^{\prime}, \ldots, \vec{h}_{N}^{\prime}\right\}, \vec{h}_{i}^{\prime} \in \mathbb{R}^{F^{\prime}}$，其中$F^{\prime}$为输出特征的维度，根据实际情况可与输入特征的维度$F$相同或不同。
+
+对于一个深度学习模型而言，可训练的参数是它学习到提取特征能力的必要因素。而图注意力层有两个可学习的参数，权重矩阵$\mathbf{W} \in \mathbb{R}^{F^{\prime} \times F}$与注意力机$\vec{\mathbf{a}} \in \mathbb{R}^{2 F^{\prime}}$。对于每个节点$i$，定义$\mathcal{N}_{i}$为所有节点$i$的一阶近邻，包括其自身。图注意力层应用了注意力机制，可以学习到节点与其一阶近邻传播特征的权重。对每个节点$j \in \mathcal{N}_{i}$，计算一个注意力系数$\alpha_{i j}$，如式\ref{GAT:attention}。
+
+\begin{equation} \label{GAT:attention}
+    \alpha_{i j}=\frac{\exp \left(\operatorname{LeakyReLU} \left(\vec{\mathbf{a}}^{T}\left[\mathbf{W} \vec{h}_{i} \| \mathbf{W} \vec{h}_{j}\right]\right)\right)}{\sum_{k \in \mathcal{N}_{i}} \exp \left(\operatorname{LeakyReLU}\left(\vec{\mathbf{a}}^{T}\left[\mathbf{W} \vec{h}_{i} \| \mathbf{W} \vec{h}_{k}\right]\right)\right)}
+\end{equation}
+
+式中$\|$为向量拼接操作，操作$T$为矩阵转置，$\operatorname{LeakyReLU}(\cdot)$为非线性激活函数（参数$\alpha$为0.2），如式\ref{GAT:LeakyReLU}。将$\mathbf{W} \vec{h}_{i} \in \mathbb{R}^{F^{\prime} \times 1}$与$\mathbf{W} \vec{h}_{j} \in \mathbb{R}^{F^{\prime} \times 1}$沿第0维拼接后，与注意力机$\vec{\mathbf{a}}$做乘法运算得出节点$j$对$i$的注意力分量，再与所有节点的注意力分量之和做Softmax运算，得出注意力系数$\alpha_{i j}$。此时很容易看出，节点$i$的所有一阶近邻节点的注意力系数之和为1。
+
+\begin{equation} \label{GAT:LeakyReLU}
+    \operatorname{LeakyReLU}(x)=\left\{\begin{array}{ll}
+    x, & x \geq 0 \\
+    \alpha x, & x<0
+    \end{array} \in R\right.
+\end{equation}
+
+那么便可以计算出节点$i$的输出特征向量$\vec{h}_{i}^{\prime}$，如式\ref{GAT:output1}，其中$\sigma(\cdot)$为非线性激活函数。
+
+\begin{equation} \label{GAT:output1}
+    \vec{h}_{i}^{\prime}=\sigma\left(\sum_{j \in \mathcal{N}_{i}} \alpha_{i j} \mathbf{W} \vec{h}_{j}\right)
+\end{equation}
+
+此外，参考CNN中卷积核的通道数，图注意力层也可以使用类似的机制，构建多个图注意力机$\vec{\mathbf{a}}_{k}$和权重矩阵$\mathbf{W}_{k}$，使训练过程更稳定，收敛更迅速。最终输出的特征向量为$k$个图注意力机输出的特征向量的拼接或均值。
+
+\subsubsection{区域特征的传播}
+
+由于知识图谱中每一个分类都作为一个节点，实际上，依数据集不同，节点数量在800到3000不等。若对全部节点计算注意力机制，势必会消耗极多的运算资源和内存。但对单张图像样例来说，即使应用了软分类机制，图像中对象区域对应的节点数量也会远小于总分类节点。因此，当样例中的对象区域的特征依软分类机制被分配到对应的节点上之后，其他没有被对应的节点的特征值全部赋值为0，在计算时也不以其为中心节点。这样大部分无意义节点就会被跳过，节省运算资源的同时，也不会影响区域特征的传播。
+
+此外，基于一个常识性假设，图像中距离相近的物体分类之间具备语义关系的概率较大，而较远的物体分类间即使具备语义关系，也很有可能是巧合。如人与自行车两个对象，若二者距离较近，其可能发生的是人驾驶自行车的语义关系。若实际情况中，自行车与人之间存在很远的间隔，那么二者的驾驶关系就十分微弱乃至不成立。除驾驶关系外，大部分的语义关系都发生于较近的对象之间，则为了防止这样错误的传播出现，应在应用语义关系时加入空间关系，来削弱距离较远的巧合情况，增强距离较近的强语义关系，从而改善对语义关系的利用。
+
+因此，在计算特征传播的过程中，额外加入一个像素距离权重$d_{i j}$，该权重的计算方式与空间知识图谱$G_{S}$的边权$e_{i j}^{S}$一致，如式\ref{Gs_edge}。则本模型中，节点$i$的区域特征$\vec{h}_{i}$经过一次传播后，输出特征$\vec{h}_{i}^{\prime}$的计算如式\ref{GAT:output2}。
+
+\begin{equation} \label{GAT:output2}
+    \vec{h}_{i}^{\prime}=\sigma\left(\sum_{j \in \mathcal{N}_{i}} \alpha_{i j} d_{i j} \mathbf{W} \vec{h}_{j}\right)
+\end{equation}
 
 \subsection{分类的重新预测}
 
