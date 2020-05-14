@@ -24,13 +24,15 @@
 
 \subsection{背景知识简介}
 
-本研究中利用了ResNet\upcite{He2016DeepRL}、特征金字塔网络（Feature Pyramid Networks, FPN）\upcite{Lin2017FeaturePN}、感兴趣区域（Region of Interest, RoI）层等技术。
+本研究中利用了ResNet\cite{He2016DeepRL}、特征金字塔网络（Feature Pyramid Networks, FPN）pcite{Lin2017FeaturePN}、感兴趣区域（Region of Interest, RoI）层\cite{Girshick2015FastR,He2017MaskR}等技术。
 
 \subsubsection{ResNet}
 
 ResNet提出了残差连接和瓶颈结构，两者皆可以用以构建更深更高效的卷积网络。前者可以解决在网络较深时出现的梯度丢失问题，后者则利用瓶颈结构使模型更小更高效。
 
-\paragraph{残差连接} 在以往的卷积网络中，采用直接堆叠卷积核的方式加深网络，而在深层网络中，往往会出现梯度丢失问题，即在过多层的梯度传导中，梯度降低至0。这导致加深网络的深度反而导致网路的性能下降。对于本研究来说，只有够深的网络才能有较强的特征提取能力，使模型具备视觉推理的能力。而ResNet解决了这一问题，其在每个卷积的构建单元中，增加一个残差分支来传导梯度，防止梯度在过多卷积层的传导中丢失。这使得加深卷积网络，如使用100层以上的网络时，网络的性能依然可以继续提升。
+\paragraph{残差连接} 在以往的卷积网络中，采用直接堆叠卷积核的方式加深网络，如著名的VGGNet\cite{Simonyan2015VeryDC}。而在深层网络中，往往会出现梯度丢失问题，即在过多层的梯度传导中，梯度降低至0，这导致加深网络的深度反而导致网路的性能下降。因此VGGNet等往往构建不到20层卷积核便达到了最高能力。但是，本研究意图赋予模型视觉推理能力的基础是充分提取图像的像素特征，而往往较深的网络才能有满足本研究所需的特征提取能力。
+
+而ResNet解决了这一问题，其在每个卷积的构建单元中，对残差函数增加一个捷径分支来传导梯度，防止梯度在过多卷积层的传导中丢失。这使得加深卷积网络，如使用100层以上的网络时，网络的性能依然可以继续提升。
 
 \begin{figure}[h!]
     \centering
@@ -41,7 +43,7 @@ ResNet提出了残差连接和瓶颈结构，两者皆可以用以构建更深�
 
 残差连接的捷径分支有多种连接方法，如投影、零填充和恒等连接。
 
-\subparagraph{恒等连接} 等式(\ref{res:iden})代表一个卷积构建单元，其中$\mathbf{x}$代表输入的特征，，$\mathcal{F}$代表一个由卷积核构成的残差函数，往往由两层$3 \times 3$卷积层构建而成。而$W_{i}$为该构建单元中卷积核的权重。如图\ref{fig:resnet_building_block}.
+\subparagraph{恒等连接} 等式(\ref{res:iden})代表一个卷积构建单元，其中$\mathbf{x}$代表输入的特征，，$\mathcal{F}$代表一个由卷积核构成的残差函数，往往由两层$3 \times 3$卷积层构建而成。而$W_{i}$为该构建单元中卷积核的权重。如图\ref{fig:resnet_building_block}。
 
 \begin{equation} \label{res:iden}
     y = \mathcal{F} (\mathbf{x}, \{W_{i}\}) + \mathbf{x}.
@@ -142,3 +144,7 @@ ResNet提出了残差连接和瓶颈结构，两者皆可以用以构建更深�
 图神经网络\cite{Scarselli2009TheGN}是对结构化数据进行特征提取的有效网络结构，根据传播方式的不同，可细化为图卷积网络等不同形态。图卷积网络中卷积的引入使运算更切合信息在拓扑结构上传播的本质，这类卷积运算分为频域（Spectral Domain）和空域（Spatial Domain）两种。基于频域运算的图卷积网络\cite{Bruna2014SpectralNA, Kipf2017SemiSupervisedCW}使用特殊构造的卷积核，对图进行傅里叶变换，从而在频域进行运算。基于空域的图卷积网络\cite{Duvenaud2015ConvolutionalNO,Atwood2016DiffusionConvolutionalNN}将卷积操作定义在节点上，直接对其近邻节点进行操作。
 
 一种先进的图注意力网络\cite{Velickovic2018GraphAN}（Graph Attention Networks, GAT）在空域图卷积网络的基础上，受机器翻译中的联合学习\cite{Bahdanau2015NeuralMT}启发，引入了注意力机制，通过自注意力策略计算每个节点和其近邻节点的一种隐式表达，可以应用在具有任意度的图节点上。
+
+\section{课题研究方法}
+
+\section{论文构成及研究内容}
