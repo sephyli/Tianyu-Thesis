@@ -1,0 +1,43 @@
+% !Mode:: "TeX:UTF-8"
+\chapter{知识图谱构建}
+
+视觉推理模型利用的关系信息进行视觉推理的能力来源于知识图谱$G$，该知识图谱包含不同对象类别之间的人类常识性语义关系与空间关系。知识图谱在模型中起到关键作用，因为它关系着不同类别间的特征沿怎样的路径传播，合理地构建知识图谱可以有效地提升关系利用的效果。本研究主要使用语义关系构建关系知识图谱与属性知识图谱，或使用空间关系构建空间知识图谱。
+
+\section{使用语义关系构建知识图谱}
+
+\begin{figure}[ht]
+    \centering
+    \subfigure[基于关系的知识图谱]{
+        \includegraphics[width=0.45\textwidth]{figure/subgraph_r.png}
+        \label{fig:subgraph:r}
+    }
+    \subfigure[基于属性的知识图谱]{
+        \includegraphics[width=0.45\textwidth]{figure/subgraph_a.png}
+        \label{fig:subgraph:a}
+    }
+    \caption{$G_{R}$与$G_{A}$中部分分类间的子图图示}
+    \label{fig:subgraph}
+\end{figure}
+
+构建基于语义关系的知识图谱有多种途径。首先，根据VG数据集中提供的标注中出现的对象间关系，如位置关系，主-谓-宾关系等等，结合该关系在对象类别之间共同出现的频率，可以构建出依据关系的知识图谱$G_{R}$。另外，根据VG数据集提供的标注中出现的对象属性，如颜色、材质、形状等等，可以构建出对象类别与属性间的概率分布表\upcite{Xu2019ReasoningRCNNUA}。则对每一对对象类别$i$和$j$的概率分布$P_{i}$与$P_{j}$计算Jensen–Shannon散度，就可以得到属性知识图谱$G_{A}$的边$e_{i j}^{A}=\operatorname{JS} \left(P_{i} \| P_{j}\right)$。
+
+$G_{R}$与$G_{A}$中部分分类间的子图如图\ref{fig:subgraph}所示。当特征在关系知识图谱上$G_{R}$传播时，高置信度的常见分类的节点，就可以通过知识图谱的边对与其相关联的稀少分类节点传播特征，从而丰富稀少分类节点中的特征信息，从而强化其置信率。而与其无关联的节点不会接收到特征的传递，防止特征在分类间泛化，降低模型表现。另外，通过常识得知，属性相近的物体在外观上近似。因为颜色和材质决定了物体表面对光线的反射水平，颜色和材质相近的物体在图像中的像素颜色近似，而外形则影响图像中的形状。如图\ref{fig:subgraph:a}中，摩托车和自行车具有极其相近的属性，其外观也极其相近。而外观相近的物体间存在误认情况，通过属性知识图谱$G_{A}$，使属性相近的物体的分类节点间有特征的传递，可以使预测的置信度趋向由误认分类向正确分类移动。
+
+\section{使用空间关系构建知识图谱}
+
+根据图像中对象的空间位置关系，可以构建出基于空间的知识图谱$G_{S}$。对象的位置关系分为上下、左右，以及对象区域的包含、重叠等关系。对于对象的上下、左右关系，知识图谱边的权重由对象在图像中的像素距离决定，像素距离越远，对象之间的关系越稀疏，因此边的权重应该越低。因此，本研究在节点上应用了核函数$\kappa(x)=\exp (-x / \Delta)$（其中$\Delta = 50$），如图\ref{fig:kernel_func}。对于对象区域的包含或重叠关系，还额外使用图像的交并比（Intersection over Union, IoU）来定义空间关系的边，即对象区域重叠的面积与区域并集面积的比值，IoU越大，代表对象关系越密切。
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=.5\textwidth]{figure/kernel.png}
+    \caption{核函数$\kappa(x)=\exp (-x / \Delta)$}
+    \label{fig:kernel_func}
+\end{figure}
+
+对于对象所在区域$R_i$、$R_j$，上文提到的像素距离$\operatorname{d}\left(R_i, R_j\right)$通过计算原图像中对象区域中心点位置来得到。而对于重叠来说，重叠关系应比普通的上下左右关系更密切，因此边权为计算出像素距离的权重后$d_{i j}$，再加上重叠对象的交并比$\operatorname{IoU}\left(R_i, R_j\right)$。由于未重叠对象的交并比为0，则对任意对象$i$、$j$，其边权的计算如式\ref{Gs_edge}。
+
+\begin{equation} \label{Gs_edge}
+    e_{i j}^{S}=\kappa\left(\operatorname{d}\left(R_i, R_j\right)\right) + \operatorname{IoU}\left(R_i, R_j\right)
+\end{equation}
+
+在计算出边权后，由于边权为核函数$\kappa(x)$加重叠区域的交并比，对于距离较近且存在重叠现象的区域之间，其对应节点间边的边权可能出现大于1的情况，这会使该节点的权重大于节点的自连接权重。因此，对知识图谱中节点的边权进行标准化，保证其分布在$\left(0, 1\right]$之间。
